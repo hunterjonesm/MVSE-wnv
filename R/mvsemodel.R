@@ -337,10 +337,16 @@ setMethod(f="sampling",
               mvse_data$H <- (.smoothUDSeries(mvse_data$H, smoothing))
               mvse_data$T <- (.smoothUDSeries(mvse_data$T, smoothing))
             }
-            mvse_data$oH<- mvse_data$H
-            mvse_data$H<-  (mvse_data$H-min(mvse_data$H, na.rm=TRUE))/(max(mvse_data$H, na.rm=TRUE)-min(mvse_data$H, na.rm=TRUE)) #normalize
-
+            mvse_data$vpd <- .vpd(mvse_data$T,mvse_data$H) ## CALL NEW FUNC TO CALC VPD FROM RH & TEMP
+            mvse_data$oH  <- mvse_data$H
+            #mvse_data$H   <- (mvse_data$H-min(mvse_data$H, na.rm=TRUE))/(max(mvse_data$H, na.rm=TRUE)-min(mvse_data$H, na.rm=TRUE)) #normalize
+            ## Replaced use of RH with VPD instead, but allowing package to cascade this replacement throughout so VPD is the humidity variable used.
+            ## This logic is based upon the justification in Brown et al., 2022 [DOI: 10.1111/ele.14228] since RH is to be understood with T; VPD factors it in.
+            mvse_data$H   <- (mvse_data$vpd-min(mvse_data$vpd, na.rm=TRUE))/(max(mvse_data$vpd, na.rm=TRUE)-min(mvse_data$vpd, na.rm=TRUE)) #normalize
+            
             # essential for P
+            
+            mvse_data$temp_aV <- .mvse_temp_effect_aV(mvse_data$T) ##NEW ADDED TO CALC KNOWN TEMP EFFECT ON BITING
             mvse_data$hum_aV <- .mvse_hum_effect_aV(mvse_data$H, mean(mvse_data$H))
             mvse_data$temp_muV <- .mvse_temp_effect_muV(mvse_data$T)
             mvse_data$hum_muV <- .mvse_hum_effect_muV(mvse_data$H, mean(mvse_data$H))
@@ -725,17 +731,18 @@ setMethod(f="plot_priors",
     muH <- muHs[ii]
     gammaH <- gammaHs[ii]
     deltaH <- deltaHs[ii]
-    muV_t <- eta*mvse_data$temp_muV*(1+mvse_data$hum_muV)^rho
-
+    
     # calculate ento-epi parameters
-    muV_t <- eta*mvse_data$temp_muV*(1+mvse_data$hum_muV)^rho
+    muV_t <- eta*mvse_data$temp_muV*(1+mvse_data$hum_muV)^rho #VPD cascaded down and now used in place of mvse_data$H
     if (mvsemodel@model_category!="denv_aegypti") {
       alpha <- sMCMC_alpha[ii]
       gammaV_t <- alpha*mvse_data$temp_gammaV
     }
     else gammaV_t <- .sample_gammaV(temps=mvse_data$T, groups=priors$mosq_inc_per$temps,
                                     rngs=mosq_inc_per_rng)
-    a_t <- prior_mosq_biting_freq_mean*(1+mvse_data$hum_aV)^rho
+    #a_t <- prior_mosq_biting_freq_mean*(1+mvse_data$hum_aV)^rho #Original package code
+    #Replacing biting frequency mean with biting freq estimate given temperature, from literature.
+    a_t <- mvse_data$temp_aV*(1+mvse_data$hum_aV)^rho #VPD cascaded down and now used in place of mvse_data$H
     epsilonVH_t<- mvse_data$temp_epsVH
     betaVH <- a_t*epsilonVH_t
     epsilonHV_t <- mvse_data$temp_epsHV;
@@ -786,29 +793,74 @@ setMethod(f="plot_priors",
 }
 
 ## set the prior distributions for the human/vector ecological/epidemiological parameters
+# .get_aegypti_priors <- function() {
+#   # intrinsic incubation period
+#   human_inc_per <- list(dist="lognormal", pars=c("meanlog"=1.738, "sdlog"=1/sqrt(11.386)))
+#   # mosquito life expectancy
+#   mosq_life_exp <- list(dist="normal", pars=c("mean"=10, "sd"=2.55))
+#   # mosquito biting frequency
+#   mosq_biting_freq <- list(dist="normal", pars=c("mean"=0.25, "sd"=0.01))
+#   # human life expectancy
+#   human_life_exp <- list(dist="normal", pars=c("mean"=70, "sd"=3))
+#   # human infectious period
+#   human_inf_per <- list(dist="normal", pars=c("mean"=4, "sd"=0.51))
+#   # extrinsic incubation period
+#   mosq_inc_per <- list(temps=c(15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 50),
+#                        dists=list(
+#                          `15`=list(dist="lognormal", pars=c("meanlog"=6.53, "sdlog"=1.08)),
+#                          `17.5`=list(dist="lognormal", pars=c("meanlog"=5.21, "sdlog"=0.69)),
+#                          `20`=list(dist="lognormal", pars=c("meanlog"=4.19, "sdlog"=0.43)),
+#                          `22.5`=list(dist="lognormal", pars=c("meanlog"=3.33, "sdlog"=0.26)),
+#                          `25`=list(dist="lognormal", pars=c("meanlog"=2.67, "sdlog"=0.18)),
+#                          `27.5`=list(dist="lognormal", pars=c("meanlog"=2.15, "sdlog"=0.15)),
+#                          `30`=list(dist="lognormal", pars=c("meanlog"=1.74, "sdlog"=0.15)),
+#                          `32.5`=list(dist="lognormal", pars=c("meanlog"=1.41, "sdlog"=0.15)),
+#                          `50`=list(dist="lognormal", pars=c("meanlog"=1.15, "sdlog"=0.15))
+#                        ))
+#   return(list(mosq_life_exp=mosq_life_exp, mosq_inc_per=mosq_inc_per, mosq_biting_freq=mosq_biting_freq,
+#               human_life_exp=human_life_exp, human_inc_per=human_inc_per, human_inf_per=human_inf_per))
+# }
+
+## NEW UPDATE: Now set for Culex instead of Aedes
+## THIS HAS BEEN MODIFIED TO USE CULEX PIPIENS PRIORS
+#If not otherwise noted, from Lourenço et al., 2020 [10.2807/1560-7917.ES.2020.25.46.1900629]
 .get_aegypti_priors <- function() {
-  # intrinsic incubation period
-  human_inc_per <- list(dist="lognormal", pars=c("meanlog"=1.738, "sdlog"=1/sqrt(11.386)))
-  # mosquito life expectancy
-  mosq_life_exp <- list(dist="normal", pars=c("mean"=10, "sd"=2.55))
-  # mosquito biting frequency
-  mosq_biting_freq <- list(dist="normal", pars=c("mean"=0.25, "sd"=0.01))
-  # human life expectancy
-  human_life_exp <- list(dist="normal", pars=c("mean"=70, "sd"=3))
-  # human infectious period
-  human_inf_per <- list(dist="normal", pars=c("mean"=4, "sd"=0.51))
-  # extrinsic incubation period
+  # intrinsic incubation period but for BIRDS rather than humans
+  human_inc_per <- list(dist="normal", pars=c("mean"=1.5, "sd"=1))
+  # CULEX mosquito life expectancy
+  mosq_life_exp <- list(dist="normal", pars=c("mean"=30.374, "sd"=3.911)) #NEW from https://parasitesandvectors.biomedcentral.com/articles/10.1186/s13071-023-05792-3/tables/2
+  # Formerly used this which is too low: https://www.biorxiv.org/content/10.1101/2022.05.30.494059v1.full
+  # CULEX mosquito biting frequency
+  mosq_biting_freq <- list(dist="normal", pars=c("mean"=0.14, "sd"=0.02))
+  # BIRD life expectancy in years
+  human_life_exp <- list(dist="normal", pars=c("mean"=12, "sd"=2))
+  # BIRD infectious period in days
+  human_inf_per <- list(dist="normal", pars=c("mean"=6, "sd"=1))
+  # CULEX extrinsic incubation period from https://doi.org/10.1111/tbed.14513
+  # mosq_inc_per <- list(temps=c(15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 50),
+  #                      dists=list(
+  #                        `15`=list(dist="lognormal", pars=c("meanlog"=3.32, "sdlog"=.04)),
+  #                        `17.5`=list(dist="lognormal", pars=c("meanlog"=3.18, "sdlog"=0.05)),
+  #                        `20`=list(dist="lognormal", pars=c("meanlog"=3.04, "sdlog"=0.05)),
+  #                        `22.5`=list(dist="lognormal", pars=c("meanlog"=2.91, "sdlog"=0.06)),
+  #                        `25`=list(dist="lognormal", pars=c("meanlog"=2.77, "sdlog"=0.07)),
+  #                        `27.5`=list(dist="lognormal", pars=c("meanlog"=2.63, "sdlog"=0.08)),
+  #                        `30`=list(dist="lognormal", pars=c("meanlog"=2.49, "sdlog"=0.1)),
+  #                        `32.5`=list(dist="lognormal", pars=c("meanlog"=2.35, "sdlog"=0.12)),
+  #                        `50`=list(dist="lognormal", pars=c("meanlog"=1.30, "sdlog"=0.41))
+  #                      ))
+  # NEW as of 02FEB2025 CULEX extrinsic incubation period from https://doi.org/10.1016/j.jinf.2024.106296
   mosq_inc_per <- list(temps=c(15, 17.5, 20, 22.5, 25, 27.5, 30, 32.5, 50),
                        dists=list(
-                         `15`=list(dist="lognormal", pars=c("meanlog"=6.53, "sdlog"=1.08)),
-                         `17.5`=list(dist="lognormal", pars=c("meanlog"=5.21, "sdlog"=0.69)),
-                         `20`=list(dist="lognormal", pars=c("meanlog"=4.19, "sdlog"=0.43)),
-                         `22.5`=list(dist="lognormal", pars=c("meanlog"=3.33, "sdlog"=0.26)),
-                         `25`=list(dist="lognormal", pars=c("meanlog"=2.67, "sdlog"=0.18)),
-                         `27.5`=list(dist="lognormal", pars=c("meanlog"=2.15, "sdlog"=0.15)),
-                         `30`=list(dist="lognormal", pars=c("meanlog"=1.74, "sdlog"=0.15)),
-                         `32.5`=list(dist="lognormal", pars=c("meanlog"=1.41, "sdlog"=0.15)),
-                         `50`=list(dist="lognormal", pars=c("meanlog"=1.15, "sdlog"=0.15))
+                         `15`=list(dist="Weibull", pars=c("mean"=145.1, "sd"=106.2)),
+                         `17.5`=list(dist="Weibull", pars=c("mean"=85.9, "sd"=61.5)),
+                         `20`=list(dist="Weibull", pars=c("mean"=49.4, "sd"=36.1)),
+                         `22.5`=list(dist="Weibull", pars=c("mean"=29, "sd"=21.2)),
+                         `25`=list(dist="Weibull", pars=c("mean"=17, "sd"=12.4)),
+                         `27.5`=list(dist="Weibull", pars=c("mean"=9.9, "sd"=7.2)),
+                         `30`=list(dist="Weibull", pars=c("mean"=5.8, "sd"=4.2)),
+                         `32.5`=list(dist="Weibull", pars=c("mean"=3.4, "sd"=2.5)),
+                         `50`=list(dist="Weibull", pars=c("mean"=.1, "sd"=0.1))
                        ))
   return(list(mosq_life_exp=mosq_life_exp, mosq_inc_per=mosq_inc_per, mosq_biting_freq=mosq_biting_freq,
               human_life_exp=human_life_exp, human_inc_per=human_inc_per, human_inf_per=human_inf_per))
@@ -826,3 +878,11 @@ setMethod(f="plot_priors",
   }
   return(samples)
 }
+
+##### 
+## NEW FUNCTIONS ADDED BY HMJ ##
+
+# Changelog:
+# Added mvse_data$vpd <- and mvse_data$temp_aV to calculate new biting rate (a) function.
+# Added new formula for calculating biting rate (a_t) using not only T but also VPD.
+# Replaced all built-in Aedes + Human priors with Culex + Bird priors.
