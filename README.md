@@ -1,4 +1,46 @@
 
+# MVSE Updates for *Culex pipiens* transmission of West Nile virus
+
+This repository is a fork from \[taishiNakase/MVSE\] that supplements
+the manuscript **Jones 2025** focused on customizing the MVSE package to
+be better suited to predicting West Nile Virus transmission in *Culex
+pipiens* mosquitos. The fork primarily updated:
+
+- **mvsemodel.R**
+
+  - This code was updated to replace RH with VPD, add T to the biting
+    rate equation, and replace *Aedes* priors with *Culex* estimates
+    from literature.
+
+- **utils.R**
+
+  - This code was updated to add the Weibull distribution, replace the
+    *Aedes* mortality and biting rate functions with *Culex* versions,
+    and to calculate VPD from RH and T.
+
+The following additional files were added to the /manuscript folder to
+support development of the paper:
+
+- **estCulexPriors.Rmd** (and associated html file)
+
+  - This R Notebook contains the test and diagnostic code used to
+    develop the new functions and priors for the *Culex* version of
+    MVSE.
+
+- **mvseCustomRuns.Rmd** (and associated html file)
+
+  - This R Notebook contains the scripts used to run the custom *Culex*
+    MVSE. Due to challenges compiling the package on Mac OS stemming
+    from changes to libraries available in Xcode, this Notebook was run
+    on Ubuntu via a VMware Fusion instance.
+
+- **mvseOriginalRuns.Rmd** (and associated html file)
+
+  - This R Notebook contains the scripts used to run the original
+    *Aedes* MVSE. It also contains the code used to prepare the West
+    Nile virus disease data from ArboNet and to obtain the environmental
+    data using GSODR.
+
 # MVSE
 
 MVSE, Mosquito-borne Viral Suitability Estimator, provides methods for
