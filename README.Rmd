@@ -12,13 +12,29 @@ knitr::opts_chunk$set(
 library(knitr)
 ```
 
+# MVSE Updates for *Culex pipiens* transmission of West Nile virus
+
+This repository is a fork from [taishiNakase/MVSE] that supplements the manuscript **Jones 2025** focused on customizing the MVSE package to be better suited to predicting West Nile Virus transmission in *Culex pipiens* mosquitos. The fork primarily updated:
+* mvsemodel.R
+  * This code was updated to replace RH with VPD, add T to the biting rate equation, and replace *Aedes* priors with *Culex* estimates from literature.
+* utils.R
+  * This code was updated to add the Weibull distribution, replace the *Aedes* mortality and biting rate functions with *Culex* versions, and to calculate VPD from RH and T.
+
+The following additional files were added to the /manuscript folder to support development of the paper:
+* estCulexPriors.Rmd (and associated html file)
+  * This R Notebook contains the test and diagnostic code used to develop the new functions and priors for the *Culex* version of MVSE.
+* mvseCustomRuns.Rmd (and associated html file)
+  * This R Notebook contains the scripts used to run the custom *Culex* MVSE. Due to challenges compiling the package on Mac OS stemming from changes to libraries available in Xcode, this Notebook was run on Ubuntu via a VMware Fusion instance.
+* mvseOriginalRuns.Rmd (and associated html file)
+  * This R Notebook contains the scripts used to run the original *Aedes* MVSE. It also contains the code used to prepare the West Nile virus disease data from ArboNet and to obtain the environmental data using GSODR.
+
 # MVSE
 
-MVSE, Mosquito-borne Viral Suitability Estimator, provides methods for the estimation of an index of climate-based transmission potential for mosquito-borne viruses. It can be parameterized for any combination of host, virus and mosquito-species of interest with local climate data. 
+MVSE, Mosquito-borne Viral Suitability Estimator, provides methods for the estimation of an index of climate-based transmission potential for mosquito-borne viruses. It can be parameterized for any combination of host, virus and mosquito-species of interest with local climate data.
 
 ## Installation
 
-The MVSE package is currently not hosted on CRAN (Comprehensive R Archive Network). We thus need to install the package directly from the GithHub repo where it is hosted. 
+The MVSE package is currently not hosted on CRAN (Comprehensive R Archive Network). We thus need to install the package directly from the GithHub repo where it is hosted.
 
 ```{r results='hide', message=FALSE}
 install.packages("devtools")
@@ -31,15 +47,15 @@ install_github("TaishiNakase/MVSE")
 
 ## Example
 
-Let's go through a short example of how one might use MVSE to estimate Index P for some mosquito-borne virus. 
+Let's go through a short example of how one might use MVSE to estimate Index P for some mosquito-borne virus.
 
-First, we will install some packages. 
+First, we will install some packages.
 
 ```{r message=FALSE}
 library(MVSE)
 ```
 
-We first need to create a `mvse_model` object, which requires time series data for climatic variables (i.e. temperature, humidity and rainfall) as well as epi-entomological prior distributions for the virus/vector/host system of interest. 
+We first need to create a `mvse_model` object, which requires time series data for climatic variables (i.e. temperature, humidity and rainfall) as well as epi-entomological prior distributions for the virus/vector/host system of interest.
 
 ```{r}
 # climate data
@@ -55,19 +71,19 @@ priors <- list(mosq_life_exp=list(pars=c(mean=12, sd=2), dist="normal"),
 example_mvse_model <- mvse_model(model_name="user_test", climate_data=climateFSA, priors=priors)
 ```
 
-Let's take a look at the input data to be used in the sampling procedure. 
+Let's take a look at the input data to be used in the sampling procedure.
 
 ```{r}
 example_mvse_model
 ```
 
-Next, let's perform the MCMC (Markov chain Monte Carlo) sampling procedure to estimate Index P. 
+Next, let's perform the MCMC (Markov chain Monte Carlo) sampling procedure to estimate Index P.
 
 ```{r}
 example_mvse_fit <- sampling(example_mvse_model, verbose=FALSE)
 ```
 
-Finally, let's take a look at the estimated distribution of the time series of Index P. 
+Finally, let's take a look at the estimated distribution of the time series of Index P.
 
 ```{r}
 indexP_plot <- mcmc_index_dist(example_mvse_fit, index="indexP")
