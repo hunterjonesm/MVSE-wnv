@@ -60,10 +60,10 @@
 }
 
 #CALCULATES MOSQ DEATH RATE COMPONENT DEPENDENT ON TEMPERATURE IN TIME
-# .mvse_temp_effect_muV <- function(temp){
-#   ef <- (0.8692-0.1590*temp+(0.01116*(temp^2))-0.0003408*(temp^3)+0.000003809*(temp^4))
-#   return(ef)
-# }
+.mvse_temp_effect_muV_aedes <- function(temp){
+  ef <- (0.8692-0.1590*temp+(0.01116*(temp^2))-0.0003408*(temp^3)+0.000003809*(temp^4))
+  return(ef)
+}
 #NEW CULEX PIPIENS VERSION from 10.1007/s00436-014-4152-x
 #EDITED TO RE-ENABLE TRIMMING FOR MAX LIFESPAN & PREVENT NEGATIVE
 .mvse_temp_effect_muV <- function(temp){
