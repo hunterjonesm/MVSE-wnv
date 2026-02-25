@@ -1,0 +1,17 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Jones
+  given-names: Hunter M.
+  orcid: https://orcid.org/0000-0003-4588-3911
+- family-names: Brett-Major
+  given-names: David
+- family-names: Fauver
+  given-names: Joseph R.
+- family-names: Gwon
+  given-names: Yeongjin
+- family-names: Bell
+  given-names: Jesse E.
+title: "West Nile Virus Transmission Suitability Modeling for Culex pipiens via Temperature and Humidity"
+version: "Manuscript 2025GH001665R"
+date-released: 2026-02-25
